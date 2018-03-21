@@ -2,9 +2,12 @@
 
 #global variables
 my_used_db=""
+pk_value=""
 
 
 #todo: db,table,col must start with alpha.
+#      menu.
+#display row or table.
 
 
 #create db engine folder.
@@ -125,7 +128,8 @@ create_table(){
   echo "append array: ${arr[@]}"
 }
  
-#inset into table.
+
+#insert into table.
 insert_table(){
   echo "please enter the table name you want to insert data into: "
   read table_name
@@ -134,39 +138,86 @@ insert_table(){
     read table_name
   done
   declare -a arr_insert
+  declare -a arr_inserted
   #get first word in each file until pk
   #while
-  echo "cut value"
   ar=($(cut -d' ' -f1 ~/my_DB_Engine/$my_used_db/$table_name))
-  echo "array is: ${ar[@]}"
+  arr_type=($(cut -d' ' -f2 ~/my_DB_Engine/$my_used_db/$table_name))
   for j in "${ar[@]}"; do
-    echo $j
     if [ "$j" = "pk" ];then
-      echo "break"
+      pk_value="$(grep -oP "pk\s+\K\w+" ~/my_DB_Engine/$my_used_db/$table_name)"
+      echo "pk: $pk_value"
       break 1
     else
-      echo "here: $j"
       eval "arr_insert+=($j)"
       let j++;
     fi
   done
-  echo "inserted: ${arr_insert[@]}"
-  echo ${arr_insert[@]} >> ~/my_DB_Engine/$my_used_db/$table_name
+
   #count array size
   c="0"
   while [[ c -lt ${#arr_insert[@]} ]];do
     echo "please enter ${arr_insert[c]}: "
     read value
-    #get type of this field.
-    #fields names are reserved!
-    #if number
-    #if string
+    if [[ ${arr_type[c]} = "Integer" ]];then
+      re='^[0-9]+$'
+      while [[ ! $value =~ $re ]] ; do
+         echo "please enter a valid integer!"
+         read value
+      done
+      #if the coloumn is pk.
+      if [[ ${arr_insert[c]} = $pk_value ]];then
+        #get col number.
+        col_no="$(grep -n "$pk_value" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1 | head -1)"
+        col_no=$[$col_no-1]
+        if [[ $col_no = $c ]];then
+          x=$[$col_no+1]
+          res="$(cut -d ' ' -f $x ~/my_DB_Engine/$my_used_db/$table_name | grep -w "$value" )"
+          #pk must be unique and not null
+          while [[ ! "$res" = "" || $value = "" || ! $value =~ $re ]];do
+            echo "please enter a valid input."
+            echo "Note: pk must be unique and not null!"
+            read value
+            res="$(cut -d ' ' -f $x ~/my_DB_Engine/$my_used_db/$table_name | grep -w "$value" )"
+          done
+        fi
+      fi
+      eval "arr_inserted+=($value)"
+    elif [[ ${arr_type[c]} = "String" ]];then
+      re='^[a-zA-Z]\w{0,127}$'
+      while [[ ! $value =~ $re ]] ; do
+         echo "please enter a valid integer!"
+         echo "PS: String must start with alphabetic character."
+         read value
+      done
+      #if the coloumn is pk.
+      if [[ ${arr_insert[c]} = $pk_value ]];then
+        #get col number.
+        col_no="$(grep -n "$pk_value" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1 | head -1)"
+        col_no=$[$col_no-1]
+        if [[ $col_no = $c ]];then
+          x=$[$col_no+1]
+          res="$(cut -d ' ' -f $x ~/my_DB_Engine/$my_used_db/$table_name | grep -w "$value" )"
+          #pk must be unique and not null
+          while [[ ! "$res" = "" || $value = "" || ! $value =~ $re ]];do
+            echo "please enter a valid input."
+            echo "PS: pk must be unique and not null!"
+            read value
+            res="$(cut -d ' ' -f $x ~/my_DB_Engine/$my_used_db/$table_name | grep -w "$value" )"
+          done
+        fi
+      fi
+      eval "arr_inserted+=($value)"
+    fi
     c=$[$c+1]
   done
+  echo "( ${arr_inserted[@]} ) have been inserted into $table_name successfully!"
+  echo ${arr_inserted[@]} >> ~/my_DB_Engine/$my_used_db/$table_name
 }
 
 
 #calling
+
 #create_db
 #delete_db
 use_db
