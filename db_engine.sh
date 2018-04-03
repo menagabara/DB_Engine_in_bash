@@ -583,7 +583,7 @@ alter_table(){
 }
 
 
-#update table's field.
+#update table's fields.
 update_table(){
 	if [ "$(find ~/my_DB_Engine/$my_used_db/ -type f)" ];then 
 		declare -a arr_insert
@@ -766,6 +766,219 @@ update_table(){
 
 				#update the line.
 				sed -i "${line}s/.*/`echo ${arr_inserted[@]}`/" ~/my_DB_Engine/$my_used_db/$table_name 
+			fi
+		else
+			echo "The table is empty!"
+		fi
+	else
+		echo "There're no tables yet!"
+	fi
+}
+
+
+#update table's cell.
+update_cell(){
+	if [ "$(find ~/my_DB_Engine/$my_used_db/ -type f)" ];then 
+		declare -a arr_insert
+		declare -a arr_inserted
+	  	echo "please enter the table you want to update: "
+	  	read table_name
+
+		while [[ ! -f ~/my_DB_Engine/$my_used_db/$table_name || $table_name = "" ]];do
+			echo "please enter a valid table name: "
+			read table_name
+		done
+		if [[ -s ~/my_DB_Engine/$my_used_db/$table_name ]] ; then
+			check=""
+			check=$(sed -n '/^pk/{n;p}' ~/my_DB_Engine/$my_used_db/$table_name)
+			if [ -z "$check" ];then
+				echo "The table is empty!"
+			else
+				ar=($(cut -d' ' -f1 ~/my_DB_Engine/$my_used_db/$table_name))
+				arr_type=($(cut -d' ' -f2 ~/my_DB_Engine/$my_used_db/$table_name))	
+				echo "please enter the pk of the field you want to update: "
+				read pk 
+	
+				#search in this coloumn.
+				line="$(grep -nw "$pk" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1)"
+
+				for j in "${ar[@]}"; do
+					if [ "$j" = "pk" ];then
+						pk_value="$(grep -oP "pk\s+\K\w+" ~/my_DB_Engine/$my_used_db/$table_name)"
+						break 1
+					else
+						eval "arr_insert+=($j)"
+						let j++;
+					fi
+				done
+
+				#count array size
+				c="0"
+
+				#get pk field associated type.
+				while [[ c -lt ${#arr_insert[@]} ]];do
+					get_col=$[$c+1]
+					if [[ ${arr_insert[c]} = $pk_value ]];then
+						if [[ ${arr_type[c]} = "Integer" ]];then
+							re='^[0-9]+$'
+			
+							while [[ $line = "" || ! $pk =~ $re ]];do
+								echo "this pk doesn't exist!"
+								read pk
+								line="$(grep -nw "$pk" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1)"
+							done
+						elif [[ ${arr_type[c]} = "String" ]];then
+							re='^[a-zA-Z]\w{0,127}$'
+
+							while [[ $line = "" || ! $pk =~ $re ]];do
+								echo "this pk doesn't exist!"
+								read pk
+								line="$(grep -nw "$pk" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1)"
+							done
+						fi
+						x="$(cat ~/my_DB_Engine/$my_used_db/$table_name | cut -d ' ' -f $get_col | grep -w $pk)"
+						while [[ $x = "" ]];do
+							echo "this pk doesn't exist!"
+						  	read pk
+							x="$(cat ~/my_DB_Engine/$my_used_db/$table_name | cut -d ' ' -f $get_col | grep -w $pk)"
+						done
+						
+						break 1
+					fi
+
+					c=$[$c+1]
+				done
+	
+				echo "Please select the cell you want to update:" ${arr_insert[@]}
+				read v
+
+				while [[ ! " ${arr_insert[*]} " == *" $v "*   ]];do
+					echo "please enter a valid option!"
+					read v
+				done
+
+				c=0
+				while [[ c -lt ${#arr_insert[@]} ]];do
+					prev=$[$c+1]
+					if [[ ${arr_insert[c]} = $v ]];then
+
+						if [[ ${arr_type[c]} = "Integer" ]];then
+
+						re='^[0-9]+$'
+						echo "please enter the new ${arr_insert[c]}: "
+						read value
+			
+						while [[ ! $value =~ $re ]] ; do
+							echo "please enter a valid integer!"
+							read value
+						done
+
+						#if the coloumn is pk.
+						if [[ ${arr_insert[c]} = $pk_value ]];then
+				
+							#get col number.
+							col_no="$(grep -n "$pk_value" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1 | head -1)"
+							col_no=$[$col_no-1]
+
+							#check if value exists.
+							if [[ $col_no = $c ]];then
+								x=$[$col_no+1]
+
+								line="$(grep -nw "$pk" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1)"
+		
+								#pk must be unique and not null
+								check=1
+								while [[ ! $check = 2 ]];do
+									if [ $value = $pk ];then
+										check=2
+										break 1
+								    	else							
+										exists=$(cat ~/my_DB_Engine/$my_used_db/$table_name | tr -s ' ' | cut -d ' ' -f $x)
+
+										double_check=1
+										for val in $exists; do 
+											if [[ $val = $value ]];then
+												check=1
+												double_check=$[$double_check+1]
+											fi								
+										done
+
+										if [[ $double_check = 1 ]];then
+											break 1
+										fi
+										echo "This pk already exists!"
+										read value
+									fi
+								done
+								break 1
+							fi
+						else
+							echo "done"
+							break 1
+						fi
+
+							
+
+						elif [[ ${arr_type[c]} = "String" ]];then
+								re='^[a-zA-Z]\w{0,127}$'
+								echo "please enter the new ${arr_insert[c]}: "
+								read value
+
+								while [[ ! $value =~ $re ]] ; do
+									echo "please enter a valid String!"
+									echo "PS: String must start with alphabetic character and could only contains ( a-z, 1-9, _ )."
+									read value
+								done
+
+								#if the coloumn is pk.
+								if [[ ${arr_insert[c]} = $pk_value ]];then
+
+								#get col number.
+								col_no="$(grep -n "$pk_value" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1 | head -1)"
+								col_no=$[$col_no-1]
+								echo $col_no
+
+								if [[ $col_no = $c ]];then
+									x=$[$col_no+1]
+									line="$(grep -nw "$pk" ~/my_DB_Engine/$my_used_db/$table_name | cut -d: -f 1)"
+						
+									#pk must be unique and not null
+									#while [[ "$line" = "" || $value = "" || ! $value =~ $re || $value = "pk" ]];do 
+									check=1
+									while [[ ! $check = 2 || "$line" = "" || $value = "" || ! $value =~ $re || $value = "pk" ]];do
+										if [ $value = $pk ];then
+											check=2
+											break 1
+									    	else							
+											exists=$(cat ~/my_DB_Engine/$my_used_db/$table_name | tr -s ' ' | cut -d ' ' -f $x)
+											double_check=1
+											for v in $exists; do 
+												if [[ $v = $value ]];then
+													check=1
+													double_check=$[$double_check+1]
+												fi								
+											done
+											if [[ $double_check = 1 ]];then
+												break 1
+											fi
+											echo "This pk already exists!"
+											read value
+										fi
+									done
+									break 1
+								fi
+							else
+								break 1
+							fi
+		
+						fi
+					fi
+					c=$[$c+1]
+				done			
+
+				#update the line.
+				bl="$( cat ~/my_DB_Engine/$my_used_db/$table_name   | cut -f $prev -d' ' | sed -n `echo $line`p )"
+				sed -i "${line}s/`echo $bl `/`echo $value`/" ~/my_DB_Engine/$my_used_db/$table_name 
 			fi
 		else
 			echo "The table is empty!"
@@ -1070,7 +1283,7 @@ table_options(){
 	all=0
 	while (( !all )); do
 		echo ""
-		options=("Create table." "View table," "Delete table." "Insert into table." "Update row."  "View row." "Delete row." "Alter table." "Show tables." "Back." "Quit.")
+		options=("Create table." "View table," "Delete table." "Insert into table." "Update row." "Update cell." "View row." "Delete row." "Alter table." "Show tables." "Back." "Quit.")
 		echo "Choose an option:"
 		echo ""
 		#if [ "$(ls -A ~/my_DB_Engine/$my_used_db)" ];then
@@ -1098,26 +1311,30 @@ table_options(){
 					update_table
 					break				
 					;;
-				6)	
+				6)
+					update_cell
+					break		
+					;;
+				7)	
 					view_row
 					break	
 					;;
-				7)
+				8)
 					delete_row
 					break
 					;;
-				8)
+				9)
 					alter_table
 					break
 					;;
-				9)
+				10)
 					show_tables
 					break
 					;;
-				10)
+				11)
 					break 2
 					;;
-				11)
+				12)
 					break 4
 					;;
 				*)
@@ -1139,5 +1356,7 @@ table_options(){
 
 #calling.
 
-
 db_options
+
+
+
